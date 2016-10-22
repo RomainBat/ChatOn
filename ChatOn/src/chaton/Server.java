@@ -13,11 +13,12 @@ import java.net.Socket;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
- *
- * @author asus
+ * Represents the server gathering all the connections. Events are displayed in the console.
+ * @author Auxane & Romain
  */
 public class Server {
     @SuppressWarnings("FieldMayBeFinal")
@@ -28,10 +29,11 @@ public class Server {
     private boolean oneMoreTime;
     @SuppressWarnings("FieldMayBeFinal")
     private ArrayList<ClientThread> clientList;
+    private static int id = 0;
     
     /**
-     * 
-     * @param port 
+     * Constructor.
+     * @param port the port on which the server can be connected to.
      */
     public Server(int port){
         this.port = port;
@@ -39,7 +41,7 @@ public class Server {
     }
     
     /**
-     * 
+     * Constructor. Uses the default port.
      */
     public Server(){
         this.port = DEFAULTPORT;
@@ -47,7 +49,7 @@ public class Server {
     }
     
     /**
-     * 
+     * Start the server and loop waiting for connections from clients.
      */
     private void start(){
         try {
@@ -62,7 +64,6 @@ public class Server {
                 // Tell everybody someone just joined
                 writeToEverybody(cThread.getClientName() + " has just joined the ChatOn.");
                 write(cThread.getClientName() + " has joined the ChatOn.");
-                
             }
             
         } catch (IOException ex) {
@@ -71,8 +72,8 @@ public class Server {
     }
     
     /**
-     * Write a message on the Server console.
-     * @param txt 
+     * Writes a message to the server console.
+     * @param txt the message to write.
      */
     private void write(String txt){
         System.out.println(DATE_FORMAT.format(new Date()) + " -> " + txt);
@@ -80,10 +81,10 @@ public class Server {
     
     
     /**
-     * Broadcast a message to all the clients
-     * @param txt 
+     * Broadcasts a message to all the clients.
+     * @param txt the message to broadcast.
      */
-    private void writeToEverybody(String txt){
+    private synchronized void writeToEverybody(String txt){
         // TODO
         // Does the server know about the conversations ?
         
@@ -96,9 +97,24 @@ public class Server {
         }
     }
     
+    /**
+     * Removes a client thread from the client threads list, using its id.
+     * @param id the id of the client to be removed.
+     */
+    private synchronized void removeClient(int id){
+        for(int i=0; i<this.clientList.size() ; i++){
+            if(this.clientList.get(i).getClientId()==id){
+                this.clientList.remove(i);
+                return;
+            }
+        }
+        
+        
+    }
+    
     
     /**
-     * 
+     * Tester
      * @param args 
      */
     public static void main(String[] args) {
@@ -107,16 +123,23 @@ public class Server {
     }
     
     /**
-     * 
+     * A thread associated to a client. It will independently read and write messages to the client.
      */
     class ClientThread extends Thread{
         private Socket cSocket;
         private ObjectInputStream iStream;
         private ObjectOutputStream oStream;
         private String clientName;
+        private int clientId;
         
-        
+        /**
+         * Constructor.
+         * @param mySocket the socket of the client that is associated to the thread.
+         */
         public ClientThread(Socket mySocket){
+            this.clientId = id;
+            id++;
+            
             this.cSocket= mySocket;
             
             try {
@@ -133,12 +156,29 @@ public class Server {
                 write("Client Streams initialization error.");
             } 
         }
-
+        
+        /**
+         * Getter for the client thread name.
+         * @return the client thread name.
+         */
         public String getClientName() {
             return clientName;
         }
+
+        /**
+         * Getter for the client thread id.
+         * @return the client thread id.
+         */
+        public int getClientId() {
+            return clientId;
+        }
+        
+        
         
         @Override
+        /**
+         * Loop the input stream to listen to the messages the client sends.
+         */
         public void run(){
             //Might not be here
             Message message;
@@ -152,8 +192,10 @@ public class Server {
                             break;
                         case Message.LOGOUT :
                             // Close cSocket and everything mtf
-                            this.cSocket.close();
                             write(this.clientName + " just logged out.");
+                            oneMoreTime = false;
+                            this.close();
+                            removeClient(this.clientId);
                             break;
                         case Message.MESSAGE :
                             writeToEverybody(message.getMessage());
@@ -167,10 +209,15 @@ public class Server {
                 } catch (ClassNotFoundException ex) {
                     write("Could not find the class reading the message from : " + this.clientName);
                 }
+                
             }
         }
         
-        
+        /**
+         * Writes a message to the client using the output stream.
+         * @param txt the message to be sent
+         * @return true if it is done, false if not.
+         */
         private boolean writeToUser(String txt){
             // If the client is not connected anymore
             if(!this.cSocket.isConnected()){
@@ -185,7 +232,25 @@ public class Server {
             return true;
         }
         
+        /**
+         * Closes the connection with the client.
+         */
         private void close(){
+            try {
+                this.cSocket.close();
+            } catch (IOException ex) {
+                write("Failed to close the socket of : " + this.clientName);
+            }
+            try {
+                this.iStream.close();
+            } catch (IOException ex) {
+                write("Failed to close the input stream of : " + this.clientName);
+            }
+            try {
+                this.oStream.close();
+            } catch (IOException ex) {
+                write("Failed to close the output stream of : " + this.clientName);
+            }
             
         }
     }
