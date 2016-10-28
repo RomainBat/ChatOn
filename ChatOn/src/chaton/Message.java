@@ -8,8 +8,8 @@ package chaton;
 import java.io.Serializable;
 
 /**
- *
- * @author asus
+ * Message contenant un type et, en fonction de lui, un texte destiné à l'affichage ou non.
+ * @author Auxane & Romain
  */
 public class Message implements Serializable{
     protected static final long serialVersionUID = 42L;
@@ -19,24 +19,35 @@ public class Message implements Serializable{
     int type;   //type du message pour savoir quel traitement appliquer
 
     /**
-     * Constructor
-     * @param message
-     * @param type 
+     * Constructeur.
+     * @param message le message à afficher ou non
+     * @param type le type de message
      */
     public Message(String message, int type) {
         this.message = message;
         this.type = type;
     }
 
+    /**
+     * Getter pour le type.
+     * @return le type
+     */
     public int getType() {
         return type;
     }
 
+    /**
+     * Getter pour le message.
+     * @return le message
+     */
     public String getMessage() {
         return message;
     }
 
     @Override
+    /**
+     * Méthode toString pour le debug.
+     */
     public String toString() {
         return "Message{" + "message=" + message + ", type=" + type + '}';
     }
