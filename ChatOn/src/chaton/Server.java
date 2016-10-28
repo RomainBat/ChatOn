@@ -53,7 +53,7 @@ public class Server {
      */
     private void start(){
         try {
-            sSocket = new ServerSocket(port);
+            sSocket = new ServerSocket(this.port);
             
             oneMoreTime = true;
             while(oneMoreTime){
@@ -63,11 +63,10 @@ public class Server {
                 this.clientList.add(cThread);
                 // Tell everybody someone just joined
                 writeToEverybody(cThread.getClientName() + " has just joined the ChatOn.");
-                write(cThread.getClientName() + " has joined the ChatOn.");
             }
             
         } catch (IOException ex) {
-            write("new ServerSocket error, port : " + port);
+            write("new ServerSocket error, port : " + this.port);
         }        
     }
     
@@ -84,12 +83,12 @@ public class Server {
      * Broadcasts a message to all the clients.
      * @param txt the message to broadcast.
      */
-    private synchronized void writeToEverybody(String txt){
+    private synchronized void writeToEverybody(String txt){        
         // TODO
         // Does the server know about the conversations ?
         
         // Reverse looping through the client threads so that disconnected clients do not get to miss another one.
-        for(int i=this.clientList.size(); i >=0 ; i--){
+        for(int i=this.clientList.size()-1; i >=0 ; i--){
             if(!this.clientList.get(i).writeToUser(txt)){
                 write(this.clientList.get(i).getClientName() + " has left the chatOn.");
                 this.clientList.remove(i);
@@ -118,7 +117,27 @@ public class Server {
      * @param args 
      */
     public static void main(String[] args) {
-        Server myServer = new Server(0);
+        int inputPort = 1001;
+        switch(args.length){
+            case 0 :
+                break;
+            case 1 :
+                    System.out.println("Unknown port " + inputPort);
+                    System.out.println("Waiting for 3 args as : server adress, port, username");
+                try {
+                    inputPort = Integer.parseInt(args[0]);
+                }
+                catch(Exception e){
+                    System.out.println("Unknown port " + inputPort);
+                    System.out.println("Waiting for 1 arg as : port");
+                }
+                break;
+            default :
+                System.out.println("Waiting for 1 arg as : port");
+        }
+        
+                System.out.println("1");
+        Server myServer = new Server(inputPort);
         myServer.start();
     }
     
@@ -188,6 +207,7 @@ public class Server {
                     message = (Message) iStream.readObject();
                     switch(message.getType()){
                         case Message.WHOSTHERE :
+                            //TODO
                             // Retourner la liste des clients présents
                             break;
                         case Message.LOGOUT :
@@ -198,6 +218,7 @@ public class Server {
                             removeClient(this.clientId);
                             break;
                         case Message.MESSAGE :
+                            System.out.println("incoming : " + message.getMessage());
                             writeToEverybody(message.getMessage());
                             break;
                         default :
@@ -227,7 +248,7 @@ public class Server {
             try {
                 this.oStream.writeObject(txt);
             } catch (IOException ex) {
-                write(this.clientName + " faile to send a message.");
+                write(this.clientName + " failed to send a message.");
             }
             return true;
         }
