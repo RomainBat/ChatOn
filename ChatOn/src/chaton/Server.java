@@ -58,11 +58,13 @@ public class Server {
             oneMoreTime = true;
             while(oneMoreTime){
                 Socket communication = sSocket.accept();
+                write("waitig for connection on port " + this.port);
                 ClientThread cThread = new ClientThread(communication);
                 // Add the client
                 this.clientList.add(cThread);
+                cThread.start();
                 // Tell everybody someone just joined
-                writeToEverybody(cThread.getClientName() + " has just joined the ChatOn.");
+                writeToEverybody(cThread.getClientName() + " has just joined the ChatOn.", cThread);
             }
             
         } catch (IOException ex) {
@@ -75,7 +77,7 @@ public class Server {
      * @param txt the message to write.
      */
     private void write(String txt){
-        System.out.println(DATE_FORMAT.format(new Date()) + " -> " + txt);
+        System.out.println(DATE_FORMAT.format(new Date()) + " | " + txt);
     }
     
     
@@ -83,15 +85,17 @@ public class Server {
      * Broadcasts a message to all the clients.
      * @param txt the message to broadcast.
      */
-    private synchronized void writeToEverybody(String txt){        
+    private synchronized void writeToEverybody(String txt, ClientThread client){        
         // TODO
         // Does the server know about the conversations ?
         
         // Reverse looping through the client threads so that disconnected clients do not get to miss another one.
         for(int i=this.clientList.size()-1; i >=0 ; i--){
-            if(!this.clientList.get(i).writeToUser(txt)){
-                write(this.clientList.get(i).getClientName() + " has left the chatOn.");
-                this.clientList.remove(i);
+            if(client != this.clientList.get(i)){
+                if(!this.clientList.get(i).writeToUser(txt)){
+                    write(this.clientList.get(i).getClientName() + " has left the chatOn.");
+                    this.clientList.remove(i);
+                }                
             }
         }
     }
@@ -135,8 +139,6 @@ public class Server {
             default :
                 System.out.println("Waiting for 1 arg as : port");
         }
-        
-                System.out.println("1");
         Server myServer = new Server(inputPort);
         myServer.start();
     }
@@ -204,7 +206,7 @@ public class Server {
             boolean oneMoreTime = true;
             while(oneMoreTime){
                 try {
-                    message = (Message) iStream.readObject();
+                    message = (Message) iStream.readObject(); 
                     switch(message.getType()){
                         case Message.WHOSTHERE :
                             //TODO
@@ -218,17 +220,22 @@ public class Server {
                             removeClient(this.clientId);
                             break;
                         case Message.MESSAGE :
-                            System.out.println("incoming : " + message.getMessage());
-                            writeToEverybody(message.getMessage());
+                            write(this.clientName + " : " + message.getMessage());
+                            writeToEverybody(this.clientName + " : " + message.getMessage(), this);
+                            writeToUser("You : " + message.getMessage());
                             break;
                         default :
                             write("Wrong message type from user : " + this.clientName);
                             break;
                     }
                 } catch (IOException ex) {
-                    write("Could not read the message from the client : " + this.clientName);
+                    write("Could not read the message from the client : " + this.clientName + ". The connection is now closed.");
+                    this.close();
+                    oneMoreTime = false;
                 } catch (ClassNotFoundException ex) {
-                    write("Could not find the class reading the message from : " + this.clientName);
+                    write("Could not find the class reading the message from : " + this.clientName + ". The connection is now closed.");
+                    this.close();
+                    oneMoreTime = false;
                 }
                 
             }

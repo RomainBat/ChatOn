@@ -83,7 +83,8 @@ public class Client {
      * @param txt the message to write.
      */
     private void write(String txt){
-        System.out.println(DATE_FORMAT.format(new Date()) + " -> " + txt);
+        System.out.println(DATE_FORMAT.format(new Date()) + " | " + txt);
+        System.out.print("> ");
     }
     
     private void sendMessage(Message msg){
@@ -141,7 +142,7 @@ public class Client {
             Scanner sc = new Scanner(System.in);
             boolean oneMoreTime = true;
             while(oneMoreTime){
-                System.out.println("> ");
+                System.out.print("> ");
                 
                 String s = sc.nextLine();
                 
@@ -153,8 +154,7 @@ public class Client {
                     myClient.sendMessage(new Message("", Message.WHOSTHERE));
                 }
                 else{
-                    myClient.sendMessage(new Message(s, Message.MESSAGE));
-                    
+                    myClient.sendMessage(new Message(s, Message.MESSAGE)); 
                 }
             }
             

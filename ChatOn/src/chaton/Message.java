@@ -5,11 +5,14 @@
  */
 package chaton;
 
+import java.io.Serializable;
+
 /**
  *
  * @author asus
  */
-public class Message {
+public class Message implements Serializable{
+    protected static final long serialVersionUID = 42L;
     //constantes de type
     static final int MESSAGE = 1,  WHOSTHERE = 2, LOGOUT = 3;
     String message; //le message en lui-même
@@ -32,4 +35,10 @@ public class Message {
     public String getMessage() {
         return message;
     }
+
+    @Override
+    public String toString() {
+        return "Message{" + "message=" + message + ", type=" + type + '}';
+    }
+    
 }
