@@ -34,6 +34,14 @@ public class Client {
     private int port;
     private String serverAddress, userName;
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
+    private static final String DEFAULT_ROOM = "default";
+    private static final String DEFAULT_NAME = "Guest";
+    private String currentRoom;
+    private boolean nameIsDefault;
+
+    public String getCurrentRoom() {
+        return currentRoom;
+    }
 
     /**
      * Constructeur
@@ -46,6 +54,21 @@ public class Client {
         this.port = port;
         this.serverAddress = serverAddress;
         this.userName = userName;
+        this.currentRoom = Client.DEFAULT_ROOM;
+        this.nameIsDefault = false;
+    }/**
+     * Constructeur
+     *
+     * @param port Le port du serveur auquel se connecter
+     * @param serverAddress L'adresse du serveur auquel se connecter
+     * @param userName Le nom d'utilisateur du client
+     */
+    public Client(int port, String serverAddress) {
+        this.port = port;
+        this.serverAddress = serverAddress;
+        this.currentRoom = Client.DEFAULT_ROOM;
+        this.userName = Client.DEFAULT_NAME;
+        this.nameIsDefault = true;
     }
 
     /**
@@ -73,11 +96,25 @@ public class Client {
 
         try {
             this.oStream.writeObject(this.userName);
+            this.oStream.writeObject(this.currentRoom);
         } catch (IOException ex) {
             write("Error : could not login");
             disconnect();
             return false;
         }
+        
+        if(this.nameIsDefault){
+            try {
+                this.userName = "Guest" + (String) this.iStream.readObject();
+                this.nameIsDefault=false;
+            } catch (IOException ex) {
+                    write("Could not get the default name from server : " + ex);
+            } catch (ClassNotFoundException ex) {
+                    write("Unknown error the default name from server : " + ex);
+            }
+            
+        }
+        
         return true;
     }
 
@@ -135,15 +172,19 @@ public class Client {
      * port de connexion et le nom de l'utilisateur
      */
     public static void main(String[] args) {
-        int inputPort = 1001;
+        int inputPort = 1500;
         String inputAdress = "localhost";
-        String inputName = "Guest";
+        String inputName;
 
+        Client myClient;
+                
         switch (args.length) {
             case 0:
+                myClient = new Client(inputPort, inputAdress);
                 break;
             case 1:
                 inputAdress = args[0];
+                myClient = new Client(inputPort, inputAdress);
                 break;
             case 2:
                 inputAdress = args[0];
@@ -154,6 +195,7 @@ public class Client {
                     System.out.println("Waiting for 3 args as : server adress, port, username");
                     return;
                 }
+                myClient = new Client(inputPort, inputAdress);
                 break;
             case 3:
                 inputAdress = args[0];
@@ -165,29 +207,53 @@ public class Client {
                     return;
                 }
                 inputName = args[2];
+                myClient = new Client(inputPort, inputAdress, inputName);
                 break;
             default:
                 System.out.println("Waiting for 3 args as : server adress, port, username");
                 return;
+            
         }
 
-        Client myClient = new Client(inputPort, inputAdress, inputName);
+        
+        
+        
 
         if (!myClient.start()) {
             return;
         } else {
+            
             Scanner sc = new Scanner(System.in);
             boolean oneMoreTime = true;
             while (oneMoreTime) {
                 System.out.print("> ");
 
                 String s = sc.nextLine();
+                String tab[] = s.split(" ",2);
 
                 if (s.equalsIgnoreCase("LOGOUT")) {
                     myClient.sendMessage(new Message("", Message.LOGOUT));
                     oneMoreTime = false;
                 } else if (s.equalsIgnoreCase("WHOSTHERE")) {
                     myClient.sendMessage(new Message("", Message.WHOSTHERE));
+                } else if (tab[0].equalsIgnoreCase("CHANGEROOM")) {
+                    if(tab[1]!=null){
+                        myClient.sendMessage(new Message(tab[1], Message.CHANGEROOM));
+                        myClient.currentRoom=tab[1];
+                    }
+                    // Sinon ne rien faire
+                } else if (tab[0].equalsIgnoreCase("CHANGENAME")) {
+                    if(tab[1]!=null){
+                        // TODO Check si commence par Guest
+                        if(tab[1].indexOf(' ') == -1){
+                            myClient.sendMessage(new Message(tab[1], Message.CHANGENAME));
+                            myClient.currentRoom=tab[1];
+                        }
+                        else{
+                            myClient.write("The name " + tab[1] + " is not valid because it contains spaces.");
+                        }
+                    }
+                    // Sinon ne rien faire
                 } else {
                     myClient.sendMessage(new Message(s, Message.MESSAGE));
                 }
@@ -195,6 +261,10 @@ public class Client {
 
             myClient.disconnect();
         }
+    }
+
+    public boolean getNameIsDefault() {
+        return nameIsDefault;
     }
 
     /**
@@ -206,15 +276,24 @@ public class Client {
          * Boucle de lecture des messages venant du serveur.
          */
         public void run() {
-            while (true) {
+            boolean oneMoreTime = true;
+            
+            write("Coucou");
+            while (oneMoreTime) {
                 try {
-                    String message = (String) iStream.readObject();
-
-                    write(message);
+                    // Permet de ne pas "voler" la réponse du serveur si l'utilisateur se connecte avec le nom par défaut
+                        sleep(200);
+                        String message = (String) iStream.readObject();
+                        write(message);
                 } catch (IOException ex) {
-                    write("Connection closed by the server");
+                    write("Connection closed by the server.");
+                    disconnect();
+                    write("You are now disconnected from the server.");
+                    oneMoreTime = false;
                 } catch (ClassNotFoundException ex) {
-                    write("Unknown error reading the server message");
+                    write("Unknown error reading the server message.");
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
                 }
             }
         }
