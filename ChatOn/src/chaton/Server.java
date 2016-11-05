@@ -1,8 +1,8 @@
 /*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
+* To change this license header, choose License Headers in Project Properties.
+* To change this template file, choose Tools | Templates
+* and open the template in the editor.
+*/
 package chaton;
 
 import java.io.IOException;
@@ -30,6 +30,7 @@ public class Server {
     @SuppressWarnings("FieldMayBeFinal")
     private ArrayList<ClientThread> clientList;
     private static int id = 0;
+    private static int nameNumber = 1;
     
     /**
      * Constructor.
@@ -57,19 +58,19 @@ public class Server {
             
             oneMoreTime = true;
             while(oneMoreTime){
+                write("Waiting for connection on port " + this.port +".");
                 Socket communication = sSocket.accept();
-                write("waitig for connection on port " + this.port);
                 ClientThread cThread = new ClientThread(communication);
                 // Add the client
                 this.clientList.add(cThread);
                 cThread.start();
                 // Tell everybody someone just joined
-                writeToEverybody(cThread.getClientName() + " has just joined the ChatOn.", cThread);
+                writeToEverybody(cThread.getClientName() + " has just joined the room.", cThread, cThread.getCurrentRoom());
             }
             
         } catch (IOException ex) {
             write("new ServerSocket error, port : " + this.port);
-        }        
+        }
     }
     
     /**
@@ -85,17 +86,16 @@ public class Server {
      * Broadcasts a message to all the clients.
      * @param txt the message to broadcast.
      */
-    private synchronized void writeToEverybody(String txt, ClientThread client){        
-        // TODO
-        // Does the server know about the conversations ?
-        
+    private synchronized void writeToEverybody(String txt, ClientThread client, String room){
         // Reverse looping through the client threads so that disconnected clients do not get to miss another one.
         for(int i=this.clientList.size()-1; i >=0 ; i--){
             if(client != this.clientList.get(i)){
-                if(!this.clientList.get(i).writeToUser(txt)){
-                    write(this.clientList.get(i).getClientName() + " has left the chatOn.");
-                    this.clientList.remove(i);
-                }                
+                if(this.clientList.get(i).getCurrentRoom().equals(room)){
+                    if(!this.clientList.get(i).writeToUser(txt)){
+                        write(this.clientList.get(i).getClientName() + " has left the chatOn.");
+                        this.clientList.remove(i);
+                    }
+                }
             }
         }
     }
@@ -115,19 +115,27 @@ public class Server {
         
     }
     
+    public boolean exists(String name){
+        for(int i=0; i<clientList.size() ; i++){
+            if(clientList.get(i).getClientName().equals(name)){
+                return true;
+            }
+        }
+        return false;
+    }
     
     /**
      * Tester
-     * @param args 
+     * @param args
      */
     public static void main(String[] args) {
-        int inputPort = 1001;
+        int inputPort = 1500;
         switch(args.length){
             case 0 :
                 break;
             case 1 :
-                    System.out.println("Unknown port " + inputPort);
-                    System.out.println("Waiting for 3 args as : server adress, port, username");
+                System.out.println("Unknown port " + inputPort);
+                System.out.println("Waiting for 3 args as : server adress, port, username");
                 try {
                     inputPort = Integer.parseInt(args[0]);
                 }
@@ -152,6 +160,11 @@ public class Server {
         private ObjectOutputStream oStream;
         private String clientName;
         private int clientId;
+        private String currentRoom;
+        
+        public String getCurrentRoom(){
+            return this.currentRoom;
+        }
         
         /**
          * Constructor.
@@ -168,14 +181,26 @@ public class Server {
                 this.iStream = new ObjectInputStream(this.cSocket.getInputStream());
                 try {
                     this.clientName = (String) iStream.readObject();
+                    if(this.clientName.equals("Guest")){
+                        this.clientName = "Guest" + Server.nameNumber;
+                        this.oStream.writeObject("" + Server.nameNumber);
+                        Server.nameNumber++;
+                    }
                 } catch (ClassNotFoundException ex) {
                     write("Could not get the client's name. Initialized to anonymous");
                     this.clientName = "Anonymous";
                 }
-                write(this.clientName + " has join the ChatOn.");
+                
+                try {
+                    this.currentRoom = ((String) iStream.readObject()).toLowerCase();
+                } catch (ClassNotFoundException ex) {
+                    write("Could not get the client's room. Initialized to default");
+                    this.currentRoom = "default";
+                }
+                write(this.clientName + " has joined the " + this.currentRoom + " room.");
             } catch (IOException ex) {
                 write("Client Streams initialization error.");
-            } 
+            }
         }
         
         /**
@@ -185,7 +210,7 @@ public class Server {
         public String getClientName() {
             return clientName;
         }
-
+        
         /**
          * Getter for the client thread id.
          * @return the client thread id.
@@ -194,6 +219,15 @@ public class Server {
             return clientId;
         }
         
+        public ArrayList<String> getUsersList(String room){
+            ArrayList<String> roomUsers = new ArrayList<String>();
+            for(int i=0; i<clientList.size() ; i++){
+                if(clientList.get(i).getCurrentRoom().equals(room)){
+                    roomUsers.add(clientList.get(i).clientName);
+                }
+            }
+            return roomUsers;
+        }
         
         
         @Override
@@ -206,11 +240,14 @@ public class Server {
             boolean oneMoreTime = true;
             while(oneMoreTime){
                 try {
-                    message = (Message) iStream.readObject(); 
+                    message = (Message) iStream.readObject();
                     switch(message.getType()){
                         case Message.WHOSTHERE :
-                            //TODO
-                            // Retourner la liste des clients présents
+                            String userList = "";
+                            for (String userName : getUsersList(this.currentRoom)){
+                                userList+=("\n\t" + userName);
+                            }
+                            writeToUser("Users in the " + this.currentRoom + " room :" + userList);
                             break;
                         case Message.LOGOUT :
                             // Close cSocket and everything mtf
@@ -221,8 +258,26 @@ public class Server {
                             break;
                         case Message.MESSAGE :
                             write(this.clientName + " : " + message.getMessage());
-                            writeToEverybody(this.clientName + " : " + message.getMessage(), this);
+                            writeToEverybody(this.clientName + " : " + message.getMessage(), this, this.currentRoom);
                             writeToUser("You : " + message.getMessage());
+                            break;
+                        case Message.CHANGEROOM :
+                            write(this.clientName + " moved from the " + this.currentRoom + " room to the " + message.getMessage() + " room.");
+                            writeToEverybody(this.clientName + " left the " + this.currentRoom + ".", this, this.currentRoom);
+                            this.currentRoom = message.getMessage();
+                            writeToUser("You joined in the " + message.getMessage() + " room.");
+                            writeToEverybody(this.clientName + " joined the room.", this, this.currentRoom);
+                            break;
+                        case Message.CHANGENAME :
+                            if(!exists(message.getMessage())){
+                                write(this.clientName + " is now called " + message.getMessage() + ".");
+                                writeToEverybody(this.clientName + " is now called " + message.getMessage() + ".", this, this.currentRoom);
+                                this.clientName = message.getMessage();
+                                writeToUser("You changed your name into " + message.getMessage() + ".");
+                            }
+                            else{
+                                writeToUser(message.getMessage() + " is already used by somebody else.");
+                            }
                             break;
                         default :
                             write("Wrong message type from user : " + this.clientName);
@@ -237,7 +292,6 @@ public class Server {
                     this.close();
                     oneMoreTime = false;
                 }
-                
             }
         }
         
@@ -279,7 +333,6 @@ public class Server {
             } catch (IOException ex) {
                 write("Failed to close the output stream of : " + this.clientName);
             }
-            
         }
     }
 }
