@@ -1,8 +1,8 @@
 /*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
+* To change this license header, choose License Headers in Project Properties.
+* To change this template file, choose Tools | Templates
+* and open the template in the editor.
+*/
 
 //VERSION OPE SANS SALON
 
@@ -11,6 +11,7 @@ package chaton;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import static java.lang.Thread.sleep;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.text.SimpleDateFormat;
@@ -27,7 +28,7 @@ import java.util.logging.Logger;
  * @author Auxane & Romain
  */
 public class Client {
-
+    
     private ObjectInputStream iStream;
     private ObjectOutputStream oStream;
     private Socket cSocket;
@@ -38,11 +39,11 @@ public class Client {
     private static final String DEFAULT_NAME = "Guest";
     private String currentRoom;
     private boolean nameIsDefault;
-
+    
     public String getCurrentRoom() {
         return currentRoom;
     }
-
+    
     /**
      * Constructeur
      *
@@ -70,7 +71,7 @@ public class Client {
         this.userName = Client.DEFAULT_NAME;
         this.nameIsDefault = true;
     }
-
+    
     /**
      * Démarre le client en initialisant son socket et en lançant son service
      * d'écoute.
@@ -84,16 +85,16 @@ public class Client {
             write("Error : could not create socket on port " + this.port + " at adresse " + this.serverAddress);
             return false;
         }
-
+        
         try {
             iStream = new ObjectInputStream(this.cSocket.getInputStream());
             this.oStream = new ObjectOutputStream(this.cSocket.getOutputStream());
         } catch (IOException ex) {
             write("Error : could not create streams ");
         }
-
+        
         new ServerListener().start();
-
+        
         try {
             this.oStream.writeObject(this.userName);
             this.oStream.writeObject(this.currentRoom);
@@ -108,16 +109,14 @@ public class Client {
                 this.userName = "Guest" + (String) this.iStream.readObject();
                 this.nameIsDefault=false;
             } catch (IOException ex) {
-                    write("Could not get the default name from server : " + ex);
+                write("Could not get the default name from server : " + ex);
             } catch (ClassNotFoundException ex) {
-                    write("Unknown error the default name from server : " + ex);
+                write("Unknown error the default name from server : " + ex);
             }
-            
         }
-        
         return true;
     }
-
+    
     /**
      * Ferme les streams d'entrées et sorties ainsi que le socket.
      */
@@ -138,7 +137,7 @@ public class Client {
             write("Error closing client socket");
         }
     }
-
+    
     /**
      * Ecrit un message surla console du client.
      *
@@ -148,7 +147,7 @@ public class Client {
         System.out.println(DATE_FORMAT.format(new Date()) + " | " + txt);
         System.out.print("> ");
     }
-
+    
     /**
      * Envoie un message au server via le socket et sont output stream.
      *
@@ -161,7 +160,7 @@ public class Client {
             write("Could not send a message");
         }
     }
-
+    
     /**
      * Lecture des arguments donnés au lancement du programme et démarrage du
      * client en fonction de ceux-ci. Définition du port, de l'adresse et de
@@ -175,9 +174,9 @@ public class Client {
         int inputPort = 1500;
         String inputAdress = "localhost";
         String inputName;
-
+        
         Client myClient;
-                
+        
         switch (args.length) {
             case 0:
                 myClient = new Client(inputPort, inputAdress);
@@ -211,26 +210,20 @@ public class Client {
                 break;
             default:
                 System.out.println("Waiting for 3 args as : server adress, port, username");
-                return;
-            
+                return;      
         }
-
         
-        
-        
-
         if (!myClient.start()) {
             return;
         } else {
-            
             Scanner sc = new Scanner(System.in);
             boolean oneMoreTime = true;
             while (oneMoreTime) {
                 System.out.print("> ");
-
+                
                 String s = sc.nextLine();
                 String tab[] = s.split(" ",2);
-
+                
                 if (s.equalsIgnoreCase("LOGOUT")) {
                     myClient.sendMessage(new Message("", Message.LOGOUT));
                     oneMoreTime = false;
@@ -241,50 +234,60 @@ public class Client {
                         myClient.sendMessage(new Message(tab[1], Message.CHANGEROOM));
                         myClient.currentRoom=tab[1];
                     }
+                } else if (tab[0].equalsIgnoreCase("WHISPER")) {
+                    if(tab[1]!=null){
+                        myClient.sendMessage(new Message(tab[1], Message.WHISPER));
+                    }
                     // Sinon ne rien faire
                 } else if (tab[0].equalsIgnoreCase("CHANGENAME")) {
                     if(tab[1]!=null){
-                        // TODO Check si commence par Guest
-                        if(tab[1].indexOf(' ') == -1){
+                        if(tab[1].indexOf(' ') != -1){
+                            myClient.write("The name " + tab[1] + " is not valid because it contains spaces.");
+                        }
+                        else if(tab[1].startsWith("Guest")){
+                            myClient.write("The name " + tab[1] + " is not valid because it starts with \"Guest\", which is a reserved name.");
+                        }
+                        else{
                             myClient.sendMessage(new Message(tab[1], Message.CHANGENAME));
                             myClient.currentRoom=tab[1];
                         }
-                        else{
-                            myClient.write("The name " + tab[1] + " is not valid because it contains spaces.");
-                        }
                     }
                     // Sinon ne rien faire
+                // Sinon envoyer simplement le message
                 } else {
                     myClient.sendMessage(new Message(s, Message.MESSAGE));
                 }
             }
-
             myClient.disconnect();
         }
     }
-
+    
     public boolean getNameIsDefault() {
         return nameIsDefault;
     }
-
+    
     /**
      * Service d'écoute du serveur.
      */
     class ServerListener extends Thread {
-
+        
         /**
          * Boucle de lecture des messages venant du serveur.
          */
+        @Override
         public void run() {
-            boolean oneMoreTime = true;
             
-            write("Coucou");
+            // Permet de ne pas "voler" la réponse du serveur si l'utilisateur se connecte avec le nom par défaut
+            try {
+                sleep(200);
+            } catch (InterruptedException ex) {
+                Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            boolean oneMoreTime = true;
             while (oneMoreTime) {
                 try {
-                    // Permet de ne pas "voler" la réponse du serveur si l'utilisateur se connecte avec le nom par défaut
-                        sleep(200);
-                        String message = (String) iStream.readObject();
-                        write(message);
+                    String message = (String) iStream.readObject();
+                    write(message);
                 } catch (IOException ex) {
                     write("Connection closed by the server.");
                     disconnect();
@@ -292,8 +295,6 @@ public class Client {
                     oneMoreTime = false;
                 } catch (ClassNotFoundException ex) {
                     write("Unknown error reading the server message.");
-                } catch (InterruptedException ex) {
-                    Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
                 }
             }
         }
