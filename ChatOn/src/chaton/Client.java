@@ -161,6 +161,15 @@ public class Client {
         }
     }
     
+    private void welcome(){
+        System.out.println("Welcome to ChatOn! Here are the commands of our chat :");
+        System.out.println("'CHANGENAME [new name]' : change your name");
+        System.out.println("'CHANGEROOM [room name]' : enter in a room, your messages will be visible only by the people in the same your, and will will only see their messages");
+        System.out.println("'WHOSTHERE : display who is in your room");
+        System.out.println("'WHISPER [name]' : send a message visible only by one person");
+        System.out.println("'LOGOUT' : leave the server");
+    }
+    
     /**
      * Lecture des arguments donnés au lancement du programme et démarrage du
      * client en fonction de ceux-ci. Définition du port, de l'adresse et de
@@ -216,6 +225,7 @@ public class Client {
         if (!myClient.start()) {
             return;
         } else {
+            myClient.welcome();
             Scanner sc = new Scanner(System.in);
             boolean oneMoreTime = true;
             while (oneMoreTime) {

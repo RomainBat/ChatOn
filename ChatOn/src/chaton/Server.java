@@ -271,7 +271,7 @@ public class Server {
                             removeClient(this.clientId);
                             break;
                         case Message.MESSAGE :
-                            write(this.clientName + " : " + message.getMessage());
+                            write(this.clientName + " on roon " + this.currentRoom + " : " + message.getMessage());
                             writeToEverybody(this.clientName + " : " + message.getMessage(), this, this.currentRoom);
                             writeToUser("You : " + message.getMessage());
                             break;
@@ -279,7 +279,7 @@ public class Server {
                             write(this.clientName + " moved from the " + this.currentRoom + " room to the " + message.getMessage() + " room.");
                             writeToEverybody(this.clientName + " left the " + this.currentRoom + ".", this, this.currentRoom);
                             this.currentRoom = message.getMessage();
-                            writeToUser("You joined in the " + message.getMessage() + " room.");
+                            writeToUser("You joined the " + message.getMessage() + " room.");
                             writeToEverybody(this.clientName + " joined the room.", this, this.currentRoom);
                             break;
                         case Message.CHANGENAME :
@@ -301,6 +301,7 @@ public class Server {
                             } else {
                                 writeToUser("There is nobody named " + dest + " in the chatOn.");
                             }
+                            write(this.clientName + " whispers to " + dest + " : " + mess);
                             break;
                         default :
                             write("Wrong message type from user : " + this.clientName);
