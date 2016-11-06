@@ -124,6 +124,18 @@ public class Server {
         return false;
     }
     
+
+    private boolean whisper(String origin, String dest, String mess) {
+        for(int i=0; i<clientList.size() ; i++){
+            if(clientList.get(i).getClientName().equals(dest)){
+                clientList.get(i).writeToUser("Private message from " + origin + " : " + mess);
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    
     /**
      * Tester
      * @param args
@@ -150,6 +162,8 @@ public class Server {
         Server myServer = new Server(inputPort);
         myServer.start();
     }
+    
+    
     
     /**
      * A thread associated to a client. It will independently read and write messages to the client.
@@ -279,6 +293,15 @@ public class Server {
                                 writeToUser(message.getMessage() + " is already used by somebody else.");
                             }
                             break;
+                        case Message.WHISPER :
+                            String dest = message.getMessage().split(" ",2)[0];
+                            String mess = message.getMessage().split(" ",2)[1];
+                            if(whisper(this.clientName, dest, mess)){
+                                writeToUser("Private message to " + dest + " : " + mess);
+                            } else {
+                                writeToUser("There is nobody named " + dest + " in the chatOn.");
+                            }
+                            break;
                         default :
                             write("Wrong message type from user : " + this.clientName);
                             break;
@@ -321,7 +344,7 @@ public class Server {
             try {
                 this.cSocket.close();
             } catch (IOException ex) {
-                write("Failed to close the socket of : " + this.clientName);
+                write("Failed to close the socket of : " + this.clientName + ". " + ex);
             }
             try {
                 this.iStream.close();
