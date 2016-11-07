@@ -5,7 +5,9 @@
 */
 package chaton;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
@@ -13,6 +15,7 @@ import java.net.Socket;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.Scanner;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -31,6 +34,7 @@ public class Server {
     private ArrayList<ClientThread> clientList;
     private static int id = 0;
     private static int nameNumber = 1;
+    private ServerThread serverDeamon;
     
     /**
      * Constructor.
@@ -55,19 +59,22 @@ public class Server {
     private void start(){
         try {
             sSocket = new ServerSocket(this.port);
-            
-            oneMoreTime = true;
-            while(oneMoreTime){
+            this.oneMoreTime = true;
+            this.serverDeamon = new ServerThread(this);
+            new Thread(this.serverDeamon).start();
+            while(this.oneMoreTime){
                 write("Waiting for connection on port " + this.port +".");
                 Socket communication = sSocket.accept();
-                ClientThread cThread = new ClientThread(communication);
-                // Add the client
-                this.clientList.add(cThread);
-                cThread.start();
-                // Tell everybody someone just joined
-                writeToEverybody(cThread.getClientName() + " has just joined the room.", cThread, cThread.getCurrentRoom());
+                if(this.oneMoreTime){
+                    ClientThread cThread = new ClientThread(communication);
+                    // Add the client
+                    this.clientList.add(cThread);
+                    cThread.start();
+                    // Tell everybody someone just joined
+                    writeToEverybody(cThread.getClientName() + " has just joined the room.", cThread, cThread.getCurrentRoom());
+                }
+                // TODO lancer la fermeture propre (Parcours des ClientThreads, fermeture des streams, Affichage de messages de déconnexion)
             }
-            
         } catch (IOException ex) {
             write("new ServerSocket error, port : " + this.port);
         }
@@ -87,6 +94,7 @@ public class Server {
      * @param txt the message to broadcast.
      */
     private synchronized void writeToEverybody(String txt, ClientThread client, String room){
+        // TODO Add the message to the room arrayList
         // Reverse looping through the client threads so that disconnected clients do not get to miss another one.
         for(int i=this.clientList.size()-1; i >=0 ; i--){
             if(client != this.clientList.get(i)){
@@ -124,7 +132,7 @@ public class Server {
         return false;
     }
     
-
+    
     private boolean whisper(String origin, String dest, String mess) {
         for(int i=0; i<clientList.size() ; i++){
             if(clientList.get(i).getClientName().equals(dest)){
@@ -210,6 +218,7 @@ public class Server {
                 } catch (ClassNotFoundException ex) {
                     write("Could not get the client's room. Initialized to default");
                     this.currentRoom = "default";
+                    // TODO Récupérer et afficher les messages stockés dans le tableau du salon
                 }
                 write(this.clientName + " has joined the " + this.currentRoom + " room.");
             } catch (IOException ex) {
@@ -264,14 +273,15 @@ public class Server {
                             writeToUser("Users in the " + this.currentRoom + " room :" + userList);
                             break;
                         case Message.LOGOUT :
-                            // Close cSocket and everything mtf
+                            // Close cSocket and everything
                             write(this.clientName + " just logged out.");
+                            writeToEverybody(this.clientName + " just logged out.", this, this.currentRoom);
                             oneMoreTime = false;
                             this.close();
                             removeClient(this.clientId);
                             break;
                         case Message.MESSAGE :
-                            write(this.clientName + " on roon " + this.currentRoom + " : " + message.getMessage());
+                            write(this.clientName + " in room " + this.currentRoom + " : " + message.getMessage());
                             writeToEverybody(this.clientName + " : " + message.getMessage(), this, this.currentRoom);
                             writeToUser("You : " + message.getMessage());
                             break;
@@ -279,6 +289,7 @@ public class Server {
                             write(this.clientName + " moved from the " + this.currentRoom + " room to the " + message.getMessage() + " room.");
                             writeToEverybody(this.clientName + " left the " + this.currentRoom + ".", this, this.currentRoom);
                             this.currentRoom = message.getMessage();
+                            // TODO Récupérer et afficher les messages stockés dans le tableau du salon
                             writeToUser("You joined the " + message.getMessage() + " room.");
                             writeToEverybody(this.clientName + " joined the room.", this, this.currentRoom);
                             break;
@@ -331,7 +342,7 @@ public class Server {
                 return false;
             }
             try {
-                this.oStream.writeObject(txt);
+                this.oStream.writeObject(DATE_FORMAT.format(new Date()) + " | " + txt);
             } catch (IOException ex) {
                 write(this.clientName + " failed to send a message.");
             }
@@ -358,5 +369,25 @@ public class Server {
                 write("Failed to close the output stream of : " + this.clientName);
             }
         }
+    }
+    
+    /**
+     * Lecture en continue des entrées de la console du serveur.
+     */
+    class ServerThread implements Runnable {
+        Server s;
+        public ServerThread(Server s){
+            this.s = s;
+        }
+        @Override
+        public void run(){
+            Scanner sc = new Scanner(System.in);
+            while(s.oneMoreTime){
+                if(sc.nextLine().equals("OFF")){
+                    s.oneMoreTime = false;
+                }
+            }
+        }
+        
     }
 }
