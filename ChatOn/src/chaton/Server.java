@@ -6,6 +6,7 @@
 package chaton;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -33,7 +34,7 @@ public class Server {
     private ServerSocket sSocket;
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
     private static final int DEFAULTPORT = 1200;
-    private static final int NB_MAX_MESSAGE = 10;
+    private static final int NB_MAX_MESSAGE = 5;
     private boolean oneMoreTime;
     @SuppressWarnings("FieldMayBeFinal")
     private ArrayList<ClientThread> clientList;
@@ -85,9 +86,9 @@ public class Server {
                 }
             }
             // TODO lancer la fermeture propre (Parcours des ClientThreads, fermeture des streams, Affichage de messages de déconnexion)
-            System.exit(0);
             this.save();
             System.out.println("Server ended");
+            System.exit(0);
         } catch (IOException ex) {
             write("new ServerSocket error, port : " + this.port);
         }
@@ -96,13 +97,12 @@ public class Server {
     private void save(){
         try
         {
-            FileOutputStream fos =
-            new FileOutputStream("save.ser");
+            FileOutputStream fos = new FileOutputStream("save.ser");
             ObjectOutputStream oos = new ObjectOutputStream(fos);
             oos.writeObject(this.messagesHist);
             oos.close();
             fos.close();
-            System.out.printf("Messages saved in hashmap.ser");
+            System.out.println("Messages saved in hashmap.ser");
         }
         catch(IOException ioe)
         {
@@ -113,7 +113,10 @@ public class Server {
     private void load(){
         try
         {
-            FileInputStream fis = new FileInputStream("save.ser");
+            File myFile = new File("save.ser");
+            myFile.createNewFile(); // if file already exists will do nothing 
+            
+            FileInputStream fis = new FileInputStream("save.ser"); 
             ObjectInputStream ois = new ObjectInputStream(fis);
             this.messagesHist = (HashMap) ois.readObject();
             ois.close();
@@ -151,6 +154,13 @@ public class Server {
             this.messagesHist.put(room, new ArrayList());
         }
         ((ArrayList)(this.messagesHist.get(room))).add(DATE_FORMAT.format(new Date()) + " | " + txt);
+        
+        while( ((ArrayList)(this.messagesHist.get(room))).size() > NB_MAX_MESSAGE){
+            for(int i = 1; i < ((ArrayList)(this.messagesHist.get(room))).size(); i++){
+                ((ArrayList)(this.messagesHist.get(room))).set(i-1, ((ArrayList)(this.messagesHist.get(room))).get(i));
+            }
+            ((ArrayList)(this.messagesHist.get(room))).remove(((ArrayList)(this.messagesHist.get(room))).size()-1);
+        }
         // Reverse looping through the client threads so that disconnected clients do not get to miss another one.
         for(int i=this.clientList.size()-1; i >=0 ; i--){
             if(client != this.clientList.get(i)){
@@ -374,6 +384,11 @@ public class Server {
                             writeToEverybody(this.clientName + " left the " + this.currentRoom + ".", this, this.currentRoom);
                             this.currentRoom = message.getMessage();
                             // TODO Récupérer et afficher les messages stockés dans le tableau du salon
+                            if(messagesHist.containsKey(this.currentRoom)){
+                                for(int i = 0; i < ((ArrayList)(messagesHist.get(this.currentRoom))).size(); i++){
+                                    writeToUserWithoutDate( (String)(((ArrayList)(messagesHist.get(this.currentRoom))).get(i)) );
+                                }
+                            }
                             writeToUser("You joined the " + message.getMessage() + " room.");
                             writeToEverybody(this.clientName + " joined the room.", this, this.currentRoom);
                             break;
