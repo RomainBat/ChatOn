@@ -94,6 +94,9 @@ public class Server {
         }
     }
     
+    /**
+     * Save the messages from all the room in the file "save.ser"
+     */
     private void save(){
         try
         {
@@ -110,6 +113,9 @@ public class Server {
         }
     }
     
+    /**
+     *  Load the messages from all the room from the file "save.ser"
+     */
     private void load(){
         try
         {
@@ -189,6 +195,11 @@ public class Server {
         
     }
     
+    /**
+     * Return true if a client exists with this name
+     * @param name name of the client
+     * @return 
+     */
     public boolean exists(String name){
         for(int i=0; i<clientList.size() ; i++){
             if(clientList.get(i).getClientName().equals(name)){
@@ -198,7 +209,13 @@ public class Server {
         return false;
     }
     
-    
+    /**
+     * Send a message only 1 personn will see
+     * @param origin who sends the message
+     * @param dest to who
+     * @param mess the message itself
+     * @return 
+     */
     private boolean whisper(String origin, String dest, String mess) {
         for(int i=0; i<clientList.size() ; i++){
             if(clientList.get(i).getClientName().equals(dest)){
