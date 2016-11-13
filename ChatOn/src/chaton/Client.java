@@ -102,6 +102,10 @@ public class Client {
             write("Error : could not login");
             disconnect();
             return false;
+        } catch( NullPointerException ex){
+            write("Error : could not login");
+            disconnect();
+            return false;
         }
         
         if(this.nameIsDefault){
@@ -125,16 +129,22 @@ public class Client {
             this.iStream.close();
         } catch (IOException ex) {
             write("Error closing input stream");
+        } catch( NullPointerException ex){
+            write("Error closing input stream");
         }
         try {
             this.oStream.close();
         } catch (IOException ex) {
             write("Error closing output stream");
+        } catch( NullPointerException ex){
+            write("Error closing input stream");
         }
         try {
             this.cSocket.close();
         } catch (IOException ex) {
             write("Error closing client socket");
+        } catch( NullPointerException ex){
+            write("Error closing input stream");
         }
     }
     
@@ -302,11 +312,19 @@ public class Client {
                     write("Connection closed by the server.");
                     disconnect();
                     write("You are now disconnected from the server.");
+                    System.exit(0);
                     oneMoreTime = false;
                 } catch (ClassNotFoundException ex) {
                     write("Unknown error reading the server message.");
+                } catch( NullPointerException ex){
+                    write("Connection closed by the server.");
+                    disconnect();
+                    write("You are now disconnected from the server.");
+                    System.exit(0);
+                    oneMoreTime = false;
                 }
             }
+            System.exit(0);
         }
     }
 }

@@ -6,6 +6,8 @@
 package chaton;
 
 import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
@@ -15,6 +17,8 @@ import java.net.Socket;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Hashtable;
 import java.util.Scanner;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -29,12 +33,15 @@ public class Server {
     private ServerSocket sSocket;
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
     private static final int DEFAULTPORT = 1200;
+    private static final int NB_MAX_MESSAGE = 10;
     private boolean oneMoreTime;
     @SuppressWarnings("FieldMayBeFinal")
     private ArrayList<ClientThread> clientList;
     private static int id = 0;
     private static int nameNumber = 1;
     private ServerThread serverDeamon;
+    //hashtable qui lie le nom d'un salon avec un tableau de string qui contient ses messages
+    HashMap messagesHist = new HashMap();
     
     /**
      * Constructor.
@@ -43,6 +50,7 @@ public class Server {
     public Server(int port){
         this.port = port;
         this.clientList = new ArrayList<>();
+        this.load();
     }
     
     /**
@@ -51,6 +59,7 @@ public class Server {
     public Server(){
         this.port = DEFAULTPORT;
         this.clientList = new ArrayList<>();
+        this.load();
     }
     
     /**
@@ -66,6 +75,7 @@ public class Server {
                 write("Waiting for connection on port " + this.port +".");
                 Socket communication = sSocket.accept();
                 if(this.oneMoreTime){
+                    
                     ClientThread cThread = new ClientThread(communication);
                     // Add the client
                     this.clientList.add(cThread);
@@ -73,11 +83,53 @@ public class Server {
                     // Tell everybody someone just joined
                     writeToEverybody(cThread.getClientName() + " has just joined the room.", cThread, cThread.getCurrentRoom());
                 }
-                // TODO lancer la fermeture propre (Parcours des ClientThreads, fermeture des streams, Affichage de messages de déconnexion)
             }
+            // TODO lancer la fermeture propre (Parcours des ClientThreads, fermeture des streams, Affichage de messages de déconnexion)
+            System.exit(0);
+            this.save();
+            System.out.println("Server ended");
         } catch (IOException ex) {
             write("new ServerSocket error, port : " + this.port);
         }
+    }
+    
+    private void save(){
+        try
+        {
+            FileOutputStream fos =
+            new FileOutputStream("save.ser");
+            ObjectOutputStream oos = new ObjectOutputStream(fos);
+            oos.writeObject(this.messagesHist);
+            oos.close();
+            fos.close();
+            System.out.printf("Messages saved in hashmap.ser");
+        }
+        catch(IOException ioe)
+        {
+            ioe.printStackTrace();
+        }
+    }
+    
+    private void load(){
+        try
+        {
+            FileInputStream fis = new FileInputStream("save.ser");
+            ObjectInputStream ois = new ObjectInputStream(fis);
+            this.messagesHist = (HashMap) ois.readObject();
+            ois.close();
+            fis.close();
+        }
+        catch(IOException ioe)
+        {
+            System.out.println("Could not load messages from save.ser");
+            return;
+        }
+        catch(ClassNotFoundException c)
+        {
+            System.out.println("Class not found");
+            return;
+        }
+      System.out.println("Messages loaded");
     }
     
     /**
@@ -95,6 +147,10 @@ public class Server {
      */
     private synchronized void writeToEverybody(String txt, ClientThread client, String room){
         // TODO Add the message to the room arrayList
+        if(!this.messagesHist.containsKey(room)){
+            this.messagesHist.put(room, new ArrayList());
+        }
+        ((ArrayList)(this.messagesHist.get(room))).add(DATE_FORMAT.format(new Date()) + " | " + txt);
         // Reverse looping through the client threads so that disconnected clients do not get to miss another one.
         for(int i=this.clientList.size()-1; i >=0 ; i--){
             if(client != this.clientList.get(i)){
@@ -143,6 +199,27 @@ public class Server {
         return false;
     }
     
+    /**
+     * Lecture en continue des entrées de la console du serveur.
+     */
+    class ServerThread implements Runnable {
+        Server s;
+        public ServerThread(Server s){
+            this.s = s;
+        }
+        @Override
+        public void run(){
+            Scanner sc = new Scanner(System.in);
+            while(s.oneMoreTime){
+                if(sc.nextLine().equals("OFF")){
+                    s.oneMoreTime = false;
+                    //Creation d'un nouveau client pour pouvoir quitter la boucle
+                    Client ghostClient = new Client(port, "localhost");
+                    ghostClient.start();
+                }
+            }
+        }
+    }
     
     /**
      * Tester
@@ -218,8 +295,15 @@ public class Server {
                 } catch (ClassNotFoundException ex) {
                     write("Could not get the client's room. Initialized to default");
                     this.currentRoom = "default";
-                    // TODO Récupérer et afficher les messages stockés dans le tableau du salon
                 }
+                // TODO Récupérer et afficher les messages stockés dans le tableau du salon
+                
+                if(messagesHist.containsKey(this.currentRoom)){
+                    for(int i = 0; i < ((ArrayList)(messagesHist.get(this.currentRoom))).size(); i++){
+                        writeToUserWithoutDate( (String)(((ArrayList)(messagesHist.get(this.currentRoom))).get(i)) );
+                    }
+                }
+                
                 write(this.clientName + " has joined the " + this.currentRoom + " room.");
             } catch (IOException ex) {
                 write("Client Streams initialization error.");
@@ -350,6 +434,25 @@ public class Server {
         }
         
         /**
+         * Writes a message to the client using the output stream.
+         * @param txt the message to be sent
+         * @return true if it is done, false if not.
+         */
+        private boolean writeToUserWithoutDate(String txt){
+            // If the client is not connected anymore
+            if(!this.cSocket.isConnected()){
+                this.close();
+                return false;
+            }
+            try {
+                this.oStream.writeObject(txt);
+            } catch (IOException ex) {
+                write(this.clientName + " failed to send a message.");
+            }
+            return true;
+        }
+        
+        /**
          * Closes the connection with the client.
          */
         private void close(){
@@ -371,23 +474,4 @@ public class Server {
         }
     }
     
-    /**
-     * Lecture en continue des entrées de la console du serveur.
-     */
-    class ServerThread implements Runnable {
-        Server s;
-        public ServerThread(Server s){
-            this.s = s;
-        }
-        @Override
-        public void run(){
-            Scanner sc = new Scanner(System.in);
-            while(s.oneMoreTime){
-                if(sc.nextLine().equals("OFF")){
-                    s.oneMoreTime = false;
-                }
-            }
-        }
-        
-    }
 }
